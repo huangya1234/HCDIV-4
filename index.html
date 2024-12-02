@@ -5,6 +5,7 @@
   <style>
     .legend {
       font-size: 12px;
+      cursor: pointer;
     }
     .tooltip {
       position: absolute;
@@ -14,98 +15,168 @@
       border-radius: 3px;
       pointer-events: none;
     }
+    .highlight {
+      stroke: gold;
+      stroke-width: 2px;
+    }
+    #info-panel {
+      position: absolute;
+      top: 600px;  
+      left: 900px;  
+      width: 300px;
+      padding: 10px;
+      border: 1px solid black;
+      background-color: #f9f9f9;
+    }
+    #search-container {
+      display: flex;
+      justify-content: center;  
+      align-items: center;
+      margin: 20px;
+    }
+    #search-box {
+      width: 200px;
+      padding: 5px;
+      margin-right: 10px;
+    }
+    #search-button {
+      padding: 5px;
+    }
   </style>
 </head>
 <body>
-<svg></svg>
-<div class="tooltip" style="opacity: 0;"></div>
-<script src="https://d3js.org/d3.v7.min.js"></script>
+  <h1>Singapore Population Density Map</h1>
+  <div id="search-container">
+    <input id="search-box" type="text" placeholder="Search Subzone" />
+    <button id="search-button">Search</button>
+  </div>
+  <svg></svg>
+  <div class="tooltip" style="opacity: 0;"></div>
+  <div id="info-panel">
+    <h3>Selected Subzone</h3>
+    <p id="subzone-name">Name:  </p>
+    <p id="subzone-population">Population:  </p>
+  </div>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
 
-<script>
-let width = 1000, height = 600;
+  <script>
+    let width = 1000, height = 600;
 
-let svg = d3.select("svg")
-    .attr("viewBox", "0 0 " + width + " " + height)
+    let svg = d3.select("svg")
+        .attr("viewBox", "0 0 " + width + " " + height);
 
-let tooltip = d3.select(".tooltip");
+    let tooltip = d3.select(".tooltip");
+    let infoPanel = d3.select("#info-panel");
+    let subzoneName = d3.select("#subzone-name");
+    let subzonePopulation = d3.select("#subzone-population");
+    let searchBox = d3.select("#search-box");
+    let searchButton = d3.select("#search-button");
 
-// Load external data and boot
-Promise.all([d3.json("sgmap.json"), d3.csv("population2023.csv")]).then(data => {
+    Promise.all([d3.json("sgmap.json"), d3.csv("population2023.csv")]).then(data => {
+        let mapData = data[0].features;
+        let popData = data[1];
 
-    let mapData = data[0].features;
-    let popData = data[1];
-
-    // Merge population data with map data
-    mapData.forEach(d => {
-        let subzone = popData.find(e => e.Subzone.toUpperCase() === d.properties.Name.toUpperCase());
-        d.popdata = subzone ? parseInt(subzone.Population) : 0;
-    });
-
-    // Determine color scale
-    let maxPopulation = d3.max(mapData, d => d.popdata);
-    let colorScale = d3.scaleSequential(d3.interpolateBlues)
-        .domain([0, maxPopulation]);
-
-    // Map and projection
-    let projection = d3.geoMercator()
-        .center([103.851959, 1.290270])
-        .fitExtent([[20, 20], [980, 580]], data[0]);
-
-    let geopath = d3.geoPath().projection(projection);
-
-    // Draw map
-    svg.append("g")
-        .attr("id", "districts")
-        .selectAll("path")
-        .data(mapData)
-        .enter()
-        .append("path")
-        .attr("d", geopath)
-        .attr("stroke", "black")
-        .attr("fill", d => colorScale(d.popdata))
-        .on("mouseover", (event, d) => {
-            tooltip.transition().duration(200).style("opacity", 0.9);
-            tooltip.html(`<strong>Subzone:</strong> ${d.properties.Name}<br><strong>Population:</strong> ${d.popdata}`)
-                .style("left", (event.pageX + 10) + "px")
-                .style("top", (event.pageY - 20) + "px");
-        })
-        .on("mouseout", () => {
-            tooltip.transition().duration(500).style("opacity", 0);
+        mapData.forEach(d => {
+            let subzone = popData.find(e => e.Subzone.toUpperCase() === d.properties.Name.toUpperCase());
+            d.popdata = subzone ? parseInt(subzone.Population) : 0;
         });
 
-    // Add legend
-    let legend = svg.append("g")
-        .attr("class", "legend")
-        .attr("transform", "translate(20, 500)");
+        let maxPopulation = d3.max(mapData, d => d.popdata);
+        let colorScale = d3.scaleLinear()
+            .domain([0, maxPopulation])
+            .range(["#ffcccc", "#ff0000"]);
 
-    let legendScale = d3.scaleLinear()
-        .domain([0, maxPopulation])
-        .range([0, 200]);
+        let projection = d3.geoMercator()
+            .center([103.851959, 1.290270])
+            .fitExtent([[20, 20], [980, 580]], data[0]);
 
-    let legendAxis = d3.axisBottom(legendScale)
-        .ticks(5)
-        .tickFormat(d3.format(".0f"));
+        let geopath = d3.geoPath().projection(projection);
 
-    legend.selectAll("rect")
-        .data(d3.range(0, maxPopulation, maxPopulation / 10))
-        .enter()
-        .append("rect")
-        .attr("x", d => legendScale(d))
-        .attr("y", -10)
-        .attr("width", 20)
-        .attr("height", 10)
-        .attr("fill", d => colorScale(d));
+        let mapPaths = svg.append("g")
+            .attr("id", "districts")
+            .selectAll("path")
+            .data(mapData)
+            .enter()
+            .append("path")
+            .attr("d", geopath)
+            .attr("stroke", "black")
+            .attr("fill", d => colorScale(d.popdata))
+            .on("mouseover", (event, d) => {
+                d3.select(event.currentTarget).classed("highlight", true);
+                tooltip.transition().duration(200).style("opacity", 0.9);
+                tooltip.html(`<strong>Subzone:</strong> ${d.properties.Name}<br><strong>Population:</strong> ${d.popdata}`)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 20) + "px");
+            })
+            .on("mouseout", (event) => {
+                d3.select(event.currentTarget).classed("highlight", false);
+                tooltip.transition().duration(500).style("opacity", 0);
+            })
+            .on("click", (event, d) => {
+                infoPanel.style("display", "block");
+                subzoneName.text(`Name: ${d.properties.Name}`);
+                subzonePopulation.text(`Population: ${d.popdata}`);
+            });
 
-    legend.append("g")
-        .attr("transform", "translate(0, 0)")
-        .call(legendAxis);
+        // info-panel
+        searchButton.on("click", () => {
+            let query = searchBox.node().value.trim().toUpperCase();
+            let found = mapData.find(d => d.properties.Name.toUpperCase() === query);
 
-    legend.append("text")
-        .attr("x", 0)
-        .attr("y", -20)
-        .text("Population")
-        .attr("font-size", "12px");
-});
-</script>
+            if (found) {
+                subzoneName.text(`Name: ${found.properties.Name}`);
+                subzonePopulation.text(`Population: ${found.popdata}`);
+                infoPanel.style("display", "block");
+            } else {
+                subzoneName.text("Name: Not Found");
+                subzonePopulation.text("Population: N/A");
+                infoPanel.style("display", "block");
+            }
+        });
+
+        // Add vertical clickable legend
+        let legend = svg.append("g")
+            .attr("class", "legend")
+            .attr("transform", `translate(20, 50)`);
+
+        let legendData = d3.range(0, maxPopulation, maxPopulation / 10);
+
+        legend.selectAll("rect")
+            .data(legendData)
+            .enter()
+            .append("rect")
+            .attr("x", 0)
+            .attr("y", (d, i) => i * 20)
+            .attr("width", 20)
+            .attr("height", 20)
+            .attr("fill", d => colorScale(d))
+            .on("click", (event, d) => {
+                let rangeMin = d;
+                let rangeMax = d + maxPopulation / 10;
+                mapPaths.attr("fill", feature => {
+                    let value = feature.popdata;
+                    return value >= rangeMin && value < rangeMax ? colorScale(value) : "#ccc";
+                });
+            });
+
+        legend.selectAll("text")
+            .data(legendData)
+            .enter()
+            .append("text")
+            .attr("x", 30)
+            .attr("y", (d, i) => i * 20 + 15)
+            .text(d => `${Math.round(d)}+`)
+            .style("font-size", "12px")
+            .attr("alignment-baseline", "middle")
+            .on("click", (event, d) => {
+                let rangeMin = d;
+                let rangeMax = d + maxPopulation / 10;
+                mapPaths.attr("fill", feature => {
+                    let value = feature.popdata;
+                    return value >= rangeMin && value < rangeMax ? colorScale(value) : "#ccc";
+                });
+            });
+    });
+  </script>
 </body>
 </html>
