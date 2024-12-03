@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <style>
+       body {
+      margin: 0;
+      background: linear-gradient(to bottom right, #e0f7fa, #8493be);
+      font-family: Arial, sans-serif;
+      
+    }
     .legend {
       font-size: 12px;
       cursor: pointer;
@@ -16,12 +22,11 @@
       pointer-events: none;
     }
     .highlight {
-      stroke: gold;
-      stroke-width: 2px;
+      fill: rgba(18, 147, 227, 0.5); 
     }
     #info-panel {
       position: absolute;
-      top: 600px;  
+      top: 650px;  
       left: 900px;  
       width: 300px;
       padding: 10px;
@@ -32,16 +37,30 @@
       display: flex;
       justify-content: center;  
       align-items: center;
-      margin: 20px;
+      margin: 50px 20px;
     }
-    #search-box {
-      width: 200px;
-      padding: 5px;
-      margin-right: 10px;
-    }
-    #search-button {
-      padding: 5px;
-    }
+      #search-box {
+    width: 300px;
+    padding: 10px;
+    margin-right: 15px;
+    border: 3px solid black;
+    border-radius: 5px;
+    font-size: 16px;
+  }
+      #search-button {
+    padding: 10px 20px;  
+    background-color: red;  
+    color: white;  
+    border: none;  
+    border-radius: 5px;  
+    font-size: 16px;  
+    cursor: pointer;  
+  }
+
+  #search-button:hover {
+    background-color: darkred;  
+  }
+  
   </style>
 </head>
 <body>
@@ -63,7 +82,7 @@
     let width = 1000, height = 600;
 
     let svg = d3.select("svg")
-        .attr("viewBox", "0 0 " + width + " " + height);
+        .attr("viewBox", "0 20 " + width + " " + height);
 
     let tooltip = d3.select(".tooltip");
     let infoPanel = d3.select("#info-panel");
@@ -108,15 +127,18 @@
                     .style("left", (event.pageX + 10) + "px")
                     .style("top", (event.pageY - 20) + "px");
             })
-            .on("mouseout", (event) => {
-                d3.select(event.currentTarget).classed("highlight", false);
-                tooltip.transition().duration(500).style("opacity", 0);
-            })
-            .on("click", (event, d) => {
-                infoPanel.style("display", "block");
-                subzoneName.text(`Name: ${d.properties.Name}`);
-                subzonePopulation.text(`Population: ${d.popdata}`);
-            });
+              .on("mouseover", (event, d) => {
+      d3.select(event.currentTarget).classed("highlight", true); // Add the highlight class
+      tooltip.transition().duration(200).style("opacity", 0.9);
+      tooltip.html(`<strong>Subzone:</strong> ${d.properties.Name}<br><strong>Population:</strong> ${d.popdata}`)
+          .style("left", (event.pageX + 10) + "px")
+          .style("top", (event.pageY - 20) + "px");
+  })
+  .on("mouseout", (event) => {
+      d3.select(event.currentTarget).classed("highlight", false); // Remove the highlight class
+      tooltip.transition().duration(500).style("opacity", 0);
+  });
+
 
         // info-panel
         searchButton.on("click", () => {
@@ -132,7 +154,29 @@
                 subzonePopulation.text("Population: N/A");
                 infoPanel.style("display", "block");
             }
-        });
+            let query1 = searchBox.node().value.trim().toUpperCase(); 
+                mapPaths.classed("highlight", false); 
+
+            let found2 = mapData.find(d => d.properties.Name.toUpperCase() === query); 
+
+              if (found) {
+                
+                  mapPaths
+                      .filter(d => d.properties.Name.toUpperCase() === query)
+                      .classed("highlight", true);
+
+                  
+                  subzoneName.text(`Name: ${found.properties.Name}`);
+                  subzonePopulation.text(`Population: ${found.popdata}`);
+                  infoPanel.style("display", "block");
+              } else {
+                  
+                  subzoneName.text("Name: Not Found");
+                  subzonePopulation.text("Population: N/A");
+                  infoPanel.style("display", "block");
+              }
+        }
+      );
 
         // Add vertical clickable legend
         let legend = svg.append("g")
@@ -177,6 +221,7 @@
                 });
             });
     });
+    
   </script>
 </body>
 </html>
